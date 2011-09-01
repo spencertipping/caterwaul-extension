@@ -3206,9 +3206,8 @@ meta::sdoc('js::test', <<'__');
 Unit tests.
 These are quick, visible assertions to make sure that the setup works properly.
 
-var t = function (x) {
-  try {console.log(x + ' -> ' + caterwaul.parse(x).structure())}
-  catch (e) {console.log(x + ' -> ' + e)}};
+var t = function (x) {try       {console.log(x + ' \033[1;32m' + caterwaul.parse(x).structure() + '\033[0;0m')}
+                      catch (e) {console.log(x + ' \033[1;31m' + e                              + '\033[0;0m')}};
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
