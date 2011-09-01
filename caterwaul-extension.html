@@ -239,8 +239,14 @@ meta::define_form 'template', sub {
   meta::externalize "template::$name", "template::$name", meta::eval_in("sub {\n$value\n}", "template::$name");
 };
 __
-meta::alias('er', 'edit sdoc::js::repl');
-meta::alias('et', 'edit sdoc::js::test');
+meta::alias('er', <<'__');
+edit sdoc::js::repl -f
+
+__
+meta::alias('et', <<'__');
+edit sdoc::js::test -f
+
+__
 meta::bootstrap('html', <<'__');
 <html>
   <head>
