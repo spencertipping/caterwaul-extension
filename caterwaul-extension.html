@@ -239,6 +239,8 @@ meta::define_form 'template', sub {
   meta::externalize "template::$name", "template::$name", meta::eval_in("sub {\n$value\n}", "template::$name");
 };
 __
+meta::alias('er', 'edit sdoc::js::repl');
+meta::alias('et', 'edit sdoc::js::test');
 meta::bootstrap('html', <<'__');
 <html>
   <head>
@@ -2138,6 +2140,8 @@ terminal::info("created module $name, which is automatically loaded into REPL se
                "> edit sdoc::js::$name  (longhand way to edit stuff)",
                "> $name                 (provided by alias::$name)",
                '> repl',
+               '> er       (to edit the REPL script)',
+               '> et       (to edit the test script)',
                '> render');
 
 __
@@ -3181,10 +3185,24 @@ This section is reserved for your extension modules. The 'module' function will 
 
 // modules get appended here
 
+Unit tests.
+These are loaded automatically each time you boot up the REPL. This makes it easy to see when something has gone wrong.
+
+- include js::test
+
 REPL driver.
 This enters the node.js REPL and lets you experiment with your extension.
 
 require('repl').start('caterwaul> ').context.caterwaul = caterwaul;
+
+__
+meta::sdoc('js::test', <<'__');
+Unit tests.
+These are quick, visible assertions to make sure that the setup works properly.
+
+var t = function (x) {
+  try {console.log(x + ' -> ' + caterwaul.parse(x).structure())}
+  catch (e) {console.log(x + ' -> ' + e)}};
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
