@@ -2153,7 +2153,7 @@ terminal::info("created module $name, which is automatically loaded into REPL se
 __
 meta::function('modules', <<'__');
 # Identify the modules defined by the user.
-grep $_ ne 'sdoc::js::repl' && s/^sdoc::js:://, select_keys('--criteria' => '^sdoc::js::');
+grep s/^sdoc::js::// && ! (/^repl$/ || /^test$/), select_keys('--criteria' => '^sdoc::js::');
 
 __
 meta::function('mv', <<'__');
