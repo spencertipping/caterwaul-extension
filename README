@@ -1,0 +1,3 @@
+A convenient way to write Caterwaul extensions. Though unless you have intimate
+knowledge of self-modifying Perl files you will probably find it endlessly
+frustrating and not worth your time.
