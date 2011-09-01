@@ -239,6 +239,8 @@ meta::define_form 'template', sub {
   meta::externalize "template::$name", "template::$name", meta::eval_in("sub {\n$value\n}", "template::$name");
 };
 __
+meta::alias('ed', 'edit sdoc::js::dependencies');
+meta::alias('em', 'edit sdoc::js::modules');
 meta::alias('er', <<'__');
 edit sdoc::js::repl -f
 
@@ -2126,6 +2128,7 @@ __
 meta::function('module', <<'__');
 my ($name) = @_;
 
+alias($name, "edit sdoc::js::$name");
 associate("sdoc::js::$name", <<end);
 Module name | Author name
 Licensed under the terms of the MIT source code license
@@ -2134,11 +2137,7 @@ Introduction.
 This module is called $name.
 end
 
-alias($name, "edit sdoc::js::$name");
-
-my $current_repl_template = retrieve('sdoc::js::repl');
-$current_repl_template =~ s/^(\/\/ modules get appended here)$/- include js::$name\n$1/mg;
-associate("sdoc::js::repl", $current_repl_template);
+associate('sdoc::js::modules', strip(retrieve('sdoc::js::modules')) . "\n- include js::$name\n");
 
 terminal::info("created module $name, which is automatically loaded into REPL sessions.",
                'some relevant commands:',
@@ -2147,13 +2146,14 @@ terminal::info("created module $name, which is automatically loaded into REPL se
                "> $name                 (provided by alias::$name)",
                '> repl',
                '> er       (to edit the REPL script)',
+               '> em       (to edit the module list)',
                '> et       (to edit the test script)',
                '> render');
 
 __
 meta::function('modules', <<'__');
 # Identify the modules defined by the user.
-grep s/^sdoc::js::// && ! (/^repl$/ || /^test$/), select_keys('--criteria' => '^sdoc::js::');
+grep s/^sdoc::js::// && ! (/^repl$/ || /^test$/ || /^modules$/ || /^dependencies$/), select_keys('--criteria' => '^sdoc::js::');
 
 __
 meta::function('mv', <<'__');
@@ -2234,6 +2234,7 @@ __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('render', <<'__');
 file::write("$_.js", retrieve("js::$_")) for modules();
+file::write('test.html', retrieve('pp::test.html'));
 
 __
 meta::function('repl', <<'__');
@@ -3178,23 +3179,33 @@ meta::retriever('sdocp', <<'__');
 my $attribute = attribute($_[0]);
 exists $data{"sdoc::$attribute"} ? sdocp("sdoc::$attribute") : undef;
 __
-meta::sdoc('js::repl', <<'__');
-Caterwaul core dependencies.
-These are here because it's the usual configuration for platform-agnostic Caterwaul extensions. You can do different things, however. Run 'dependencies edit' to manage the dependencies and
-where they come from.
+meta::sdoc('js::dependencies', <<'__');
+Module dependencies.
+Usually this is just Caterwaul and the standard extension. If you modify these, you should probably also run 'dependencies edit' to inform the script about where these files are downloaded
+from.
 
 - include cached_dependency::caterwaul.js
 - include cached_dependency::caterwaul.std.js
 
-Module source.
-This section is reserved for your extension modules. The 'module' function will automatically append things to this section.
+__
+meta::sdoc('js::modules', <<'__');
+Module loading code.
+This is where your modules get loaded into the REPL. This script is included by sdoc::js::repl and is used to render into HTML for cross-browser testing.
 
-// modules get appended here
+// modules go here
+
+__
+meta::sdoc('js::repl', <<'__');
+Prerequisites.
+We need to load dependencies and the extension modules.
+
+- pinclude pp::js::dependencies
+- pinclude pp::js::modules
 
 Unit tests.
 These are loaded automatically each time you boot up the REPL. This makes it easy to see when something has gone wrong.
 
-- include js::test
+- pinclude pp::js::test
 
 REPL driver.
 This enters the node.js REPL and lets you experiment with your extension.
@@ -3208,6 +3219,21 @@ These are quick, visible assertions to make sure that the setup works properly.
 
 var t = function (x) {try       {console.log(x + ' \033[1;32m' + caterwaul.parse(x).structure() + '\033[0;0m')}
                       catch (e) {console.log(x + ' \033[1;31m' + e                              + '\033[0;0m')}};
+
+__
+meta::sdoc('test.html', <<'__');
+<!doctype html>
+<html>
+  <head>
+  <script src='http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.js'></script>
+  <script>
+  - pinclude pp::js::dependencies
+  - pinclude pp::js::modules
+  - pinclude pp::js::test
+  </script>
+  </head>
+  <body></body>
+</html>
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
