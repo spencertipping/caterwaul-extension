@@ -2233,8 +2233,8 @@ my $pattern = join '|', @_;
 __
 meta::function('reload', 'around_hook(\'reload\', sub {execute($_) for grep ! /^bootstrap::/, keys %data});');
 meta::function('render', <<'__');
-file::write("$_.js", retrieve("js::$_")) for modules();
-file::write('test.html', retrieve('pp::test.html'));
+file::write("$_.js",     retrieve("js::$_")) for modules();
+file::write('test.html', retrieve('pp::html::test'));
 
 __
 meta::function('repl', <<'__');
@@ -2498,6 +2498,11 @@ unlink $other if my $result = $observed eq (my $state = state());
 terminal::error("Verification failed; expected $state but got $observed from $other") unless $result;
 hook('after-verify', $result, observed => $observed, expected => $state);
 $result;
+__
+meta::hook('after-shell-command::render', <<'__');
+# Keep files up to date automatically.
+render();
+
 __
 meta::hook('before-shell::note-about-module-function', <<'__');
 terminal::info('use the "module" function to create a new Javascript file; e.g:', '',
@@ -3179,6 +3184,30 @@ meta::retriever('sdocp', <<'__');
 my $attribute = attribute($_[0]);
 exists $data{"sdoc::$attribute"} ? sdocp("sdoc::$attribute") : undef;
 __
+meta::sdoc('html::test', <<'__');
+<!doctype html>
+<html>
+  <head>
+  <script src='http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.js'></script>
+  <script>
+  - pinclude pp::js::dependencies
+  - pinclude pp::js::modules
+
+  var t = function (x) {$('body').append($('<div>').text(test_case(x)))};
+
+  $(function () {
+    - pinclude pp::js::test
+  });
+  </script>
+
+  <style>
+    body > div {font-family: monospace}
+  </style>
+  </head>
+  <body></body>
+</html>
+
+__
 meta::sdoc('js::dependencies', <<'__');
 Module dependencies.
 Usually this is just Caterwaul and the standard extension. If you modify these, you should probably also run 'dependencies edit' to inform the script about where these files are downloaded
@@ -3205,6 +3234,9 @@ We need to load dependencies and the extension modules.
 Unit tests.
 These are loaded automatically each time you boot up the REPL. This makes it easy to see when something has gone wrong.
 
+var t = function (x) {try       {console.log(x + ' \033[1;32m' + test_case(x) + '\033[0;0m')}
+                      catch (e) {console.log(x + ' \033[1;31m' + e            + '\033[0;0m')}};
+
 - pinclude pp::js::test
 
 REPL driver.
@@ -3215,25 +3247,10 @@ require('repl').start('caterwaul> ').context.caterwaul = caterwaul;
 __
 meta::sdoc('js::test', <<'__');
 Unit tests.
-These are quick, visible assertions to make sure that the setup works properly.
+These are quick, visible assertions to make sure that the setup works properly. The test_case function is called automatically by t(), which is customized to work on whatever platform you're
+running under (e.g. node.js or a browser).
 
-var t = function (x) {try       {console.log(x + ' \033[1;32m' + caterwaul.parse(x).structure() + '\033[0;0m')}
-                      catch (e) {console.log(x + ' \033[1;31m' + e                              + '\033[0;0m')}};
-
-__
-meta::sdoc('test.html', <<'__');
-<!doctype html>
-<html>
-  <head>
-  <script src='http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.js'></script>
-  <script>
-  - pinclude pp::js::dependencies
-  - pinclude pp::js::modules
-  - pinclude pp::js::test
-  </script>
-  </head>
-  <body></body>
-</html>
+test_case = function (x) {return caterwaul.parse(x).structure()};
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
