@@ -3226,7 +3226,7 @@ meta::sdoc('html::test', <<'__');
       - pinclude pp::js::dependencies
       - pinclude pp::js::modules
 
-      var t = function (x) {$('body').append($('<div>').text(x + ' -> ' + test_case(x)))};
+      var t = function () {$('body').append($('<div>').text(Array.prototype.join.call(arguments, ', ') + ' -> ' + test_case.apply(this, arguments)))};
 
       $(function () {
         - pinclude pp::js::test
