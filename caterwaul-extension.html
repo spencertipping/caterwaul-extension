@@ -3268,8 +3268,8 @@ We need to load dependencies and the extension modules.
 Unit tests.
 These are loaded automatically each time you boot up the REPL. This makes it easy to see when something has gone wrong.
 
-var t = function () {try       {console.log(x + ' \033[1;32m' + test_case.apply(this, arguments) + '\033[0;0m')}
-                     catch (e) {console.log(x + ' \033[1;31m' + e                                + '\033[0;0m')}};
+var t = function () {try       {console.log(Array.prototype.join.call(arguments, ', ') + ' \033[1;32m' + test_case.apply(this, arguments) + '\033[0;0m')}
+                     catch (e) {console.log(Array.prototype.join.call(arguments, ', ') + ' \033[1;31m' + e                                + '\033[0;0m')}};
 
 - pinclude pp::js::test
 
