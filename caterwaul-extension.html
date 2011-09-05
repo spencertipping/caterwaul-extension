@@ -2322,7 +2322,7 @@ terminal::info("created module $name, which is automatically loaded into REPL se
 __
 meta::function('modules', <<'__');
 # Identify the modules defined by the user.
-grep s/^sdoc::js::// && ! (/^repl$/ || /^test$/ || /^modules$/ || /^dependencies$/), select_keys('--criteria' => '^sdoc::js::');
+grep s/^sdoc::js:://, select_keys('--criteria' => '^sdoc::js::', -u => 1);
 
 __
 meta::function('mv', <<'__');
@@ -2585,6 +2585,10 @@ my @keys = sort keys %data;
 my $hash = fast_hash(fast_hash(scalar @keys) . join '|', @keys);
 $hash = fast_hash("$data{$_}|$hash") for @keys;
 $hash;
+__
+meta::function('test', <<'__');
+with_exported('pp::js::test-setup', sub {sh('node', @_)});
+
 __
 meta::function('touch', 'associate($_, \'\') for @_;');
 meta::function('unlock', 'hook(\'unlock\', chmod_self(sub {$_[0] | 0200}));');
@@ -3382,6 +3386,14 @@ meta::sdoc('html::test', <<'__');
 - end
 
 __
+meta::sdoc('js::console', <<'__');
+Console-based testing.
+This color-codes the test output depending on error status.
+
+var t = function () {try       {console.log(Array.prototype.join.call(arguments, ', ') + ' \033[1;32m' + test_case.apply(this, arguments) + '\033[0;0m')}
+                     catch (e) {console.log(Array.prototype.join.call(arguments, ', ') + ' \033[1;31m' + e                                + '\033[0;0m')}};
+
+__
 meta::sdoc('js::dependencies', <<'__');
 Module dependencies.
 Usually this is just Caterwaul and the standard extension. If you modify these, you should probably also run 'dependencies edit' to inform the script about where these files are downloaded
@@ -3399,19 +3411,10 @@ This is where your modules get loaded into the REPL. This script is included by 
 
 __
 meta::sdoc('js::repl', <<'__');
-Prerequisites.
-We need to load dependencies and the extension modules.
-
-- pinclude pp::js::dependencies
-- pinclude pp::js::modules
-
 Unit tests.
-These are loaded automatically each time you boot up the REPL. This makes it easy to see when something has gone wrong.
+These are run automatically prior to starting the REPL.
 
-var t = function () {try       {console.log(Array.prototype.join.call(arguments, ', ') + ' \033[1;32m' + test_case.apply(this, arguments) + '\033[0;0m')}
-                     catch (e) {console.log(Array.prototype.join.call(arguments, ', ') + ' \033[1;31m' + e                                + '\033[0;0m')}};
-
-- pinclude pp::js::test
+- pinclude pp::js::test-setup
 
 REPL driver.
 This enters the node.js REPL and lets you experiment with your extension.
@@ -3425,6 +3428,20 @@ These are quick, visible assertions to make sure that the setup works properly. 
 running under (e.g. node.js or a browser).
 
 test_case = function (x) {return caterwaul.parse(x).structure()};
+
+__
+meta::sdoc('js::test-setup', <<'__');
+Prerequisites.
+We need to load dependencies and the extension modules.
+
+- pinclude pp::js::dependencies
+- pinclude pp::js::modules
+
+Unit tests.
+These are loaded automatically each time you boot up the REPL. This makes it easy to see when something has gone wrong.
+
+- pinclude pp::js::console
+- pinclude pp::js::test
 
 __
 meta::template('comment', '\'\';     # A mechanism for line or block comments.');
