@@ -2480,7 +2480,7 @@ Introduction.
 This module is called $name.
 end
 
-associate('sdoc::js::modules', retrieve('sdoc::js::modules') . "\n- include perl::sdoc(retrieve('module::$name'))\n");
+associate('sdoc::js::modules', retrieve('sdoc::js::modules') . "\n- include perl::sdoc('module::$name')\n");
 
 terminal::info("created module $name, which is automatically loaded into REPL sessions.",
                'some relevant commands:',
