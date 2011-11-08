@@ -221,6 +221,10 @@ meta::meta('type::meta', <<'__');
 
 meta::configure 'meta', extension => '.pl', inherit => 1;
 __
+meta::meta('type::module', <<'__');
+meta::functor::editable 'module', extension => '.js.sdoc', inherit => 1;
+
+__
 meta::meta('type::parent', <<'__');
 meta::define_form 'parent', \&meta::bootstrap::implementation;
 meta::configure 'parent', extension => '', inherit => 1;
@@ -2467,8 +2471,8 @@ __
 meta::function('module', <<'__');
 my ($name) = @_;
 
-alias($name, "edit sdoc::js::$name");
-associate("sdoc::js::$name", <<end);
+alias($name, "edit module::$name");
+associate("module::$name", <<end);
 Module name | Author name
 Licensed under the terms of the MIT source code license
 
@@ -2476,13 +2480,13 @@ Introduction.
 This module is called $name.
 end
 
-associate('sdoc::js::modules', retrieve('sdoc::js::modules') . "\n- include js::$name\n");
+associate('sdoc::js::modules', retrieve('sdoc::js::modules') . "\n- include perl::sdoc(retrieve('module::$name'))\n");
 
 terminal::info("created module $name, which is automatically loaded into REPL sessions.",
                'some relevant commands:',
                '',
-               "> edit sdoc::js::$name  (longhand way to edit stuff)",
-               "> $name                 (provided by alias::$name)",
+               "> edit module::$name  (longhand way to edit stuff)",
+               "> $name               (provided by alias::$name)",
                '> repl',
                '> er       (to edit the REPL script)',
                '> em       (to edit the module list)',
@@ -2492,8 +2496,7 @@ terminal::info("created module $name, which is automatically loaded into REPL se
 __
 meta::function('modules', <<'__');
 # Identify the modules defined by the user.
-return () if is('sdoc::js::test', '-u');
-grep s/^sdoc::js:://, select_keys('--criteria' => '^sdoc::js::', -u => 1);
+grep s/^module:://, sort keys %data;
 
 __
 meta::function('mv', <<'__');
@@ -2851,6 +2854,10 @@ __
 meta::hook('after-shell-command::render', <<'__');
 # Keep files up to date automatically.
 render();
+
+__
+meta::hook('before-shell::ad-module', <<'__');
+ad('module::');
 
 __
 meta::hook('before-shell::note-about-module-function', <<'__');
