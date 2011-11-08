@@ -2863,9 +2863,8 @@ __
 meta::hook('before-shell::note-about-module-function', <<'__');
 terminal::info('use the "module" function to create a new Javascript file; e.g:', '',
                '> module foo', '',
-               'this will create an attribute sdoc::js::foo and will append a preprocessor',
-               'entry to sdoc::js::repl.', '',
-               'defined modules:', map("  $_", modules()));
+               'this will create an attribute module::foo and will append a preprocessor',
+               'entry to sdoc::js::repl.');
 
 __
 meta::indicator('cc', 'length ::retrieve(\'data::current-continuation\') ? "\\033[1;36mcc\\033[0;0m" : \'\';');
