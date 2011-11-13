@@ -483,7 +483,7 @@ meta::cached_dependency('caterwaul.js', <<'__');
 
     lex_table = function (s) {for (var i = 0, xs = [false]; i < 8; ++i) xs.push.apply(xs, xs); for (var i = 0, l = s.length; i < l; ++i) xs[s.charCodeAt(i)] = true; return xs},
     lex_float = lex_table('.0123456789'),    lex_decimal = lex_table('0123456789'),  lex_integer = lex_table('0123456789abcdefABCDEFx'),  lex_exp = lex_table('eE'),
-    lex_space = lex_table(' \n\r\t'),        lex_bracket = lex_table('()[]{}'),       lex_opener = lex_table('([{'),                    lex_punct = lex_table('+-*/%&|^!~=<>?:;.,'),
+    lex_space = lex_table(' \n\r\t'),        lex_bracket = lex_table('()[]{}?:'),     lex_opener = lex_table('([{?:'),                  lex_punct = lex_table('+-*/%&|^!~=<>?:;.,'),
       lex_eol = lex_table('\n\r'),     lex_regexp_suffix = lex_table('gims'),          lex_quote = lex_table('\'"/'),                   lex_slash = '/'.charCodeAt(0),
      lex_star = '*'.charCodeAt(0),              lex_back = '\\'.charCodeAt(0),             lex_x = 'x'.charCodeAt(0),                     lex_dot = '.'.charCodeAt(0),
      lex_zero = '0'.charCodeAt(0),     lex_postfix_unary = hash('++ --'),              lex_ident = lex_table('$_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'),
@@ -602,6 +602,9 @@ parse_associates_right = hash('= += -= *= /= %= &= ^= |= <<= >>= >>>= ~ ! new ty
 //     the replaced node's previous children. (Nor is there much point in forcibly iterating over the new node's children, since presumably they are already processed.) If a mapping function
 //     returns something falsy, it will have exactly the same effect as returning the node without modification.
 
+    // Recursive map() and each() variants have another form starting with Caterwaul 1.1.3. These are pmap() and peach(), which recursively traverse the tree in post-order. That is, the node
+//     itself is visited after its children are.
+
     // Using the old s() to do gensym-safe replacement requires that you invoke it only once, and this means that for complex macroexpansion you'll have a long array of values. This isn't ideal,
 //     so syntax trees provide a replace() function that handles replacement more gracefully:
 
@@ -612,6 +615,9 @@ parse_associates_right = hash('= += -= *= /= %= &= ^= |= <<= >>= >>>= ~ ! new ty
 
       reach: function (f) {f(this); this.each(function (n) {n.reach(f)}); return this},
       rmap:  function (f) {var r = f(this); return ! r || r === this ? this.map(function (n) {return n.rmap(f)}) : r.rmap === undefined ? new this.constructor(r) : r},
+
+      peach: function (f) {this.each(function (n) {n.peach(f)}); f(this); return this},
+      pmap:  function (f) {var t = this.map(function (n) {return n.pmap(f)}); return f(t)},
 
       clone: function () {return this.rmap(function () {return false})},
 
@@ -990,7 +996,7 @@ is_prefix_unary_operator: function () {return has(parse_r, this.data)},         
         var s = input.toString(), mark = 0, c = 0, re = true, esc = false, dot = false, exp = false, close = 0, t = '', i = 0, l = s.length, cs = function (i) {return s.charCodeAt(i)},
             grouping_stack = [], gs_top = null, head = null, parent = null, indexes = map(function () {return []}, parse_reduce_order), invocation_nodes = [], all_nodes = [empty],
             new_node = function (n) {return all_nodes.push(n), n}, push = function (n) {return head ? head._sibling(head = n) : (head = n._append_to(parent)), new_node(n)},
-            syntax_node = this.syntax;
+            syntax_node = this.syntax, ternaries = [];
 
     // Trivial case.
 //     The empty string will break the lexer because we won't generate a token (since we're already at the end). To prevent this we return an empty syntax node immediately, since this is an
@@ -1138,8 +1144,8 @@ is_prefix_unary_operator: function () {return has(parse_r, this.data)},         
             if (has(parse_lr, data = (node = _[j]).data))  node._fold_lr();
 
       // Ambiguous parse groups.
-//       As mentioned above, we need to determine whether grouping constructs are invocations or real groups. This happens to take place before other operators are parsed (which is good -- that way
-//       it reflects the precedence of dereferencing and invocation). The only change we need to make is to discard the explicit parenthetical or square-bracket grouping for invocations or
+//       As mentioned above, we need to determine whether grouping constructs are invocations or real groups. This happens to take place before other operators are parsed (which is good -- that
+//       way it reflects the precedence of dereferencing and invocation). The only change we need to make is to discard the explicit parenthetical or square-bracket grouping for invocations or
 //       dereferences, respectively. It doesn't make much sense to have a doubly-nested structure, where we have a node for invocation and another for the group on the right-hand side of that
 //       invocation. Better is to modify the group in-place to represent an invocation.
 
@@ -1172,10 +1178,16 @@ is_prefix_unary_operator: function () {return has(parse_r, this.data)},         
       // Ternary operator behavior.
 //       This is kind of interesting. If we have a ternary operator, then it will be treated first as a group; just like parentheses, for example. This is the case because the ternary syntax is
 //       unambiguous for things in the middle. So, for example, '3 ? 4 : 5' initially parses out as a '?' node whose child is '4'. Its siblings are '3' and '5', so folding left and right is an
-//       obvious requirement. The only problem is that the children will be in the wrong order. Instead of (3) (4) (5), we'll have (4) (3) (5). So after folding, we do a quick swap of the first two
-//       to set the ordering straight.
+//       obvious requirement. The only problem is that the children will be in the wrong order. Instead of (3) (4) (5), we'll have (4) (3) (5). So after folding everything, we do a quick swap of
+//       the first two to set the ordering straight.
 
-       else if (has(parse_ternary, data))  {node._fold_lr(); var temp = node[1]; node[1] = node[0]; node[0] = temp}
+      // There's a subtle catch here. Depending on the Javascript parser, low-precedence operators may be allowed in the middle of a ?:. For example, x ? y = z : z is legal in all runtimes that
+//       I'm aware of, and x ? y, z : z is illegal only in SpiderMonkey. This becomes a problem because folding the node won't do the right thing if a low-precedence operator isn't already
+//       folded.
+
+      // The fix for this is to push the ternary onto a separate list. After all operators have been folded, we can resolve the ternary by assigning the children to the correct places.
+
+       else if (has(parse_ternary, data))  node._fold_lr(), ternaries.push(node);
 
       // Grab-until-block behavior.
 //       Not quite as simple as it sounds. This is used for constructs such as 'if', 'function', etc. Each of these constructs takes the form '<construct> [identifier] () {}', but they can also
@@ -1221,6 +1233,12 @@ is_prefix_unary_operator: function () {return has(parse_r, this.data)},         
 //     just those now. I'm preserving the 'p' pointers, though they're probably not useful beyond here.
 
         for (var i = 0, l = invocation_nodes.length, _, child; i < l; ++i)  (child = (_ = invocation_nodes[i])[1] = _[1][0] || empty) && (child.p = _);
+
+    // Another piece of this is fixing up all ternary nodes. Some ternaries have commas or assignments in the middle, which will be folded after the ternary as a whole is folded. This means two
+//     things. First, we couldn't have processed the ternary operator in a single step; and second, the children are in the wrong places as mentioned above. In particular, the ternary will have
+//     one child at [0], one at [length - 2], and the other at [length - 1]. The conditional is [length - 2], so we put this one first.
+
+        for (var i = 0, l = ternaries.length, _, n, temp; i < l; ++i)  n = (_ = ternaries[i]).length, temp = _[0], _[0] = _[n - 2], _[1] = temp, _[2] = _[n - 1], _.length = 3;
 
         while (head.p) head = head.p;
 
@@ -1833,9 +1851,16 @@ meta::cached_dependency('caterwaul.std.js', <<'__');
   // | var o = capture [f(x) = 10, g(x)(y) = x + y];
 //     o.g(10)(20)         // -> 30
 
-    modifier('capture', function (match) {for (var r = new $.syntax('{'), comma = new $.syntax(','), bindings = match._expression.flatten(','), i = 0, l = bindings.length; i < l; ++i)
+  // A variant, wcapture, provides local 'where'-style bindings as well as returning the object. This allows the definitions to refer to one another.
+
+    modifier('capture', function (match) {for (var comma = new $.syntax(','), bindings = match._expression.flatten(','), i = 0, l = bindings.length; i < l; ++i)
                                             comma.push(this(bindings[i]).with_data(':'));
-                                          return r.push(comma.unflatten())});
+                                          return new $.syntax('{', comma.unflatten())});
+
+    var wcapture_template = $.parse('(function () {var _variables; return (_expression)}).call(this)');
+    modifier('wcapture', function (match) {for (var e = this(match._expression), comma = new $.syntax(','), bindings = e.flatten(','), node, i = 0, l = bindings.length; i < l; ++i)
+                                             (node = this(bindings[i]))[1] = node[0], comma.push(node.with_data(':'));
+                                           return wcapture_template.replace({_variables: e, _expression: new $.syntax('{', comma.unflatten())})});
 
   // Importation.
 //   This is a fun one. Caterwaul 1.1.2 introduces the 'using' modifier, which lets you statically import an object. For example:
@@ -1845,7 +1870,7 @@ meta::cached_dependency('caterwaul.std.js', <<'__');
   // Variables are computed at compile-time, not at runtime. This is much better than using the 'with' keyword, which degrades performance ('using' has no significant performance impact).
 //   However, the calling context is incomplete, as shown above. In particular, methods of the object that you're using will be called with a global 'this' rather than being bound to the object.
 
-    var scope_template = $.parse('(function () {var _variables; return _expression}).call(this)');
+    var scope_template = $.parse('(function () {var _variables; return (_expression)}).call(this)');
     parameterized_modifier('using', $.reexpander(function (match) {var o = $.compile(this(match._parameters)), comma = new $.syntax(',');
                                                                    for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) comma.push(new $.syntax('=', k, new $.ref(o[k])));
                                                                    return scope_template.replace({_variables: comma.unflatten(), _expression: match._expression})}));
